@@ -1,0 +1,28 @@
+{
+  "name": "forgeflow-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:gateway": "npm run dev --workspace=apps/api-gateway",
+    "dev:auth": "npm run dev --workspace=apps/auth-service",
+    "dev:core": "npm run dev --workspace=apps/core-service",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run lint && npm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.4.0",
+    "supertest": "^7.1.4",
+    "vitest": "^3.2.4"
+  }
+}
