@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   validate:
-    name: Backend lint and tests
+    name: Backend lint, unit and integration
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,5 +25,31 @@ jobs:
         run: npm ci
       - name: Lint
         run: npm run lint
-      - name: Test
+      - name: Unit tests
         run: npm test
+
+      - name: Create isolated disposable CI credentials
+        run: |
+          umask 077
+          echo 'DB_HOST=127.0.0.1' > .env
+          echo 'DB_PORT=5433' >> .env
+          echo 'DB_NAME=forgeflow_ci' >> .env
+          echo 'REDIS_URL=redis://127.0.0.1:6380' >> .env
+          for variable in POSTGRES_PASSWORD AUTH_DB_PASSWORD CORE_DB_PASSWORD MIGRATOR_DB_PASSWORD; do
+            echo "$variable=$(openssl rand -hex 24)" >> .env
+          done
+
+      - name: Start disposable PostgreSQL and Redis
+        run: docker compose up -d --wait postgres redis
+      - name: Run versioned migrations (and replay)
+        run: |
+          npm run db:migrate
+          npm run db:migrate
+      - name: Database and Redis integration tests
+        run: npm run test:integration
+      - name: Show container status on failure
+        if: failure()
+        run: docker compose ps
+      - name: Remove disposable containers
+        if: always()
+        run: docker compose down -v
