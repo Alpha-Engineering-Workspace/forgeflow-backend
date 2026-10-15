@@ -16,13 +16,21 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "npm run lint && npm test"
+    "check": "npm run lint && npm test",
+    "db:migrate": "node --env-file-if-exists=.env scripts/db-migrate.js",
+    "db:seed": "node scripts/db-seed.js",
+    "test:integration": "node --env-file-if-exists=.env ./node_modules/vitest/vitest.mjs run --config vitest.integration.config.js"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "eslint": "^9.39.1",
     "globals": "^16.4.0",
+    "node-pg-migrate": "^9.0.0",
     "supertest": "^7.1.4",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "pg": "^8.23.1",
+    "redis": "^6.3.0"
   }
 }
