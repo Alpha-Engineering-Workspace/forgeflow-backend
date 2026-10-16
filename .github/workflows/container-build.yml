@@ -1,0 +1,54 @@
+name: Backend container build and smoke
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  containers:
+    name: Build and smoke containers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Create disposable CI database credentials
+        shell: bash
+        run: |
+          umask 077
+          echo 'DB_HOST=127.0.0.1' > .env
+          echo 'DB_PORT=5433' >> .env
+          echo 'DB_NAME=forgeflow_ci' >> .env
+          for variable in POSTGRES_PASSWORD AUTH_DB_PASSWORD CORE_DB_PASSWORD MIGRATOR_DB_PASSWORD; do
+            echo "$variable=$(openssl rand -hex 24)" >> .env
+          done
+
+      - name: Validate Compose files
+        run: docker compose -f compose.yml -f compose.apps.yml config --quiet
+
+      - name: Build and start the three service containers
+        run: docker compose -f compose.yml -f compose.apps.yml up -d --build --wait
+
+      - name: Verify the Gateway responds on host loopback
+        run: curl --fail --silent --show-error http://127.0.0.1:3001/health/live
+
+      - name: Verify Auth and Core on Docker's internal network
+        run: docker compose -f compose.yml -f compose.apps.yml exec -T gateway node scripts/smoke-internal.js
+
+      - name: Show container state on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.apps.yml ps
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose -f compose.yml -f compose.apps.yml logs --no-color --tail=80
+
+      - name: Remove disposable CI containers and volumes
+        if: always()
+        run: docker compose -f compose.yml -f compose.apps.yml down -v --remove-orphans
