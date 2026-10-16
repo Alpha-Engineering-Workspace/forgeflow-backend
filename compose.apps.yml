@@ -1,0 +1,60 @@
+# Add application services on top of the EXISTING Milestone 2B compose.yml.
+# Usage: docker-compose -f compose.yml -f compose.apps.yml up -d --build --wait
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: apps/api-gateway/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      GATEWAY_PORT: "3001"
+    ports:
+      - "127.0.0.1:3001:3001"
+    depends_on:
+      auth:
+        condition: service_healthy
+      core:
+        condition: service_healthy
+    stop_grace_period: 20s
+
+  auth:
+    build:
+      context: .
+      dockerfile: apps/auth-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      AUTH_PORT: "3002"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-forgeflow_dev}
+      AUTH_DB_PASSWORD: ${AUTH_DB_PASSWORD:?Set AUTH_DB_PASSWORD in .env}
+    expose:
+      - "3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 20s
+
+  core:
+    build:
+      context: .
+      dockerfile: apps/core-service/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      CORE_PORT: "3003"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME:-forgeflow_dev}
+      CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?Set CORE_DB_PASSWORD in .env}
+    expose:
+      - "3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    stop_grace_period: 20s

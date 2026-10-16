@@ -1,0 +1,22 @@
+# Never send local secrets to a Docker build context.
+.env
+.env.*
+!.env.example
+
+# Local/install/build artifacts.
+.git
+.github
+node_modules
+**/node_modules
+coverage
+.vitest
+.next
+*.log
+*.zip
+
+# These files are not needed in runtime images.
+tests
+docs
+docker
+compose.yml
+compose.apps.yml
