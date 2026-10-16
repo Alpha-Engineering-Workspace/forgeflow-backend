@@ -1,0 +1,16 @@
+# Frontend runs alongside the backend containers.
+services:
+  frontend:
+    build:
+      context: ../forgeflow-frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      FORGEFLOW_GATEWAY_URL: http://gateway:3001
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    stop_grace_period: 20s
