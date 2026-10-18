@@ -1,3 +1,5 @@
+> **Milestone 3 backend implementation bundle:** Authentication code and migration 003 have been added for local verification. See [docs/milestone-3-authentication.md](docs/milestone-3-authentication.md). Auth.js frontend and production mail delivery are still pending.
+
 # ForgeFlow Backend
 
 JavaScript/Node.js backend for ForgeFlow. This repository contains independent runtime services, one root npm lockfile and CI pipeline. **Milestone 2A is a skeleton, not a functional authentication or CRM API.**

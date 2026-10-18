@@ -1,3 +1,4 @@
+
 name: Backend container build and smoke
 
 on:
@@ -14,9 +15,15 @@ jobs:
     name: Build and smoke containers
     runs-on: ubuntu-latest
     timeout-minutes: 20
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
 
       - name: Create disposable CI database credentials
         shell: bash
@@ -25,9 +32,18 @@ jobs:
           echo 'DB_HOST=127.0.0.1' > .env
           echo 'DB_PORT=5433' >> .env
           echo 'DB_NAME=forgeflow_ci' >> .env
+
           for variable in POSTGRES_PASSWORD AUTH_DB_PASSWORD CORE_DB_PASSWORD MIGRATOR_DB_PASSWORD; do
             echo "$variable=$(openssl rand -hex 24)" >> .env
           done
+
+      - name: Generate disposable CI authentication secrets
+        shell: bash
+        run: |
+          umask 077
+          node scripts/generate-auth-env.js
+          cat .env.auth.generated >> .env
+          rm .env.auth.generated
 
       - name: Validate Compose files
         run: docker compose -f compose.yml -f compose.apps.yml config --quiet
@@ -52,3 +68,8 @@ jobs:
       - name: Remove disposable CI containers and volumes
         if: always()
         run: docker compose -f compose.yml -f compose.apps.yml down -v --remove-orphans
+
+      - name: Remove disposable CI credentials
+        if: always()
+        shell: bash
+        run: rm -f .env .env.auth.generated
