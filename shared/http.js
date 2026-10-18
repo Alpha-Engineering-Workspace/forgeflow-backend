@@ -8,7 +8,7 @@ import { logger } from "./logger.js";
  * Process skeleton only. Real readiness dependencies and authenticated
  * API routes arrive in subsequent milestones.
  */
-export function createHttpApp(serviceName) {
+export function createHttpApp(serviceName, mountRoutes = () => {}) {
   const app = express();
   app.disable("x-powered-by");
   // Never trust arbitrary X-Forwarded-* headers. Verified ingress policy follows.
@@ -43,6 +43,9 @@ export function createHttpApp(serviceName) {
     // Only process readiness now; 2B adds PostgreSQL/Redis dependency checks.
     res.json({ service: serviceName, status: "ready", checks: "process-only" });
   });
+
+  // Feature routes must mount BEFORE the fallback 404 handler.
+  mountRoutes(app);
 
   // Explicit 404 response after all currently registered routes.
   app.use((req, res) => {
