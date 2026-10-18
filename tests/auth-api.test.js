@@ -1,4 +1,4 @@
-import { generateKeyPairSync, randomUUID } from 'node:crypto';
+import { generateKeyPairSync, randomUUID, sign } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import request from 'supertest';
 import { createApp as createAuthApp } from '../apps/auth-service/src/app.js';
@@ -19,6 +19,8 @@ function fakeService() {
     currentUser: vi.fn(async () => ({ id: randomUUID(), name: 'A Test', email: 'a@test.example' })),
     forgotPassword: vi.fn(async () => {}),
     resetPassword: vi.fn(async () => {}),
+    verifyEmail: vi.fn(async () => {}),
+    resendEmail: vi.fn(async () => {}),
   };
 }
 
@@ -41,6 +43,16 @@ describe('Auth Service HTTP contract', () => {
       .send({ name: '', email: 'bad', password: 'short' })
       .expect(400);
   });
+  it('validates verification requests and requires internal auth', async () => {
+    const app = createAuthApp({ service: fakeService(), internalKey });
+    await request(app).post('/internal/auth/email/verify').send({ token: 'long-enough-token-value-123456789' }).expect(403);
+    await request(app).post('/internal/auth/email/verify').set('x-forgeflow-internal-key', internalKey)
+      .send({ token: 'short' }).expect(400);
+    await request(app).post('/internal/auth/email/verify').set('x-forgeflow-internal-key', internalKey)
+      .send({ token: 'long-enough-token-value-123456789' }).expect(204);
+    await request(app).post('/internal/auth/email/resend').set('x-forgeflow-internal-key', internalKey)
+      .send({ email: 'user@private-domain.example' }).expect(202);
+  });
   it('requires an access token to read /me', async () => {
     await request(createAuthApp({ service: fakeService(), internalKey }))
       .get('/internal/auth/me').set('x-forgeflow-internal-key', internalKey).expect(401);
@@ -55,6 +67,12 @@ describe('JWT authentication', () => {
     expect(() => verifyAccessToken(token + 'x', jwt, 1200)).toThrow();
     expect(() => verifyAccessToken(token, { ...jwt, audience: 'another' }, 1200)).toThrow();
     expect(() => verifyAccessToken(token, jwt, 1600)).toThrow();
+    const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify({ sub: id, iss: jwt.issuer, aud: jwt.audience,
+      iat: 1000, nbf: 1000, exp: 1600, jti: randomUUID() })).toString('base64url');
+    const content = `${header}.${payload}`;
+    const oldToken = `${content}.${sign('RSA-SHA256', Buffer.from(content), privateKey).toString('base64url')}`;
+    expect(() => verifyAccessToken(oldToken, jwt, 1200)).toThrow();
   });
 });
 
@@ -77,12 +95,21 @@ describe('Gateway /api/auth routes', () => {
       .send({ name: 'Ada', email: 'ada@example.test', password: 'my-long-password123' }).expect(201);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(fetchImpl.mock.calls[0][0].toString()).toBe('http://auth:3002/internal/auth/register');
+    await request(app).post('/api/auth/email/resend').set('x-forgeflow-bff-key', bffKey)
+      .send({ email: 'user@private-domain.example' }).expect(201);
+    expect(fetchImpl.mock.calls[1][0].toString()).toBe('http://auth:3002/internal/auth/email/resend');
     await request(app).post('/api/auth/unknown').set('x-forgeflow-bff-key', bffKey).expect(404);
   });
   it('fails closed when Redis is offline for login', async () => {
     const { app, fetchImpl } = gateway({ failingRedis: true });
     await request(app).post('/api/auth/login').set('x-forgeflow-bff-key', bffKey)
       .send({ email: 'ada@example.test', password: 'my-long-password123' }).expect(503);
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+  it('blocks resend when Redis is down', async () => {
+    const { app, fetchImpl } = gateway({ failingRedis: true });
+    await request(app).post('/api/auth/email/resend').set('x-forgeflow-bff-key', bffKey)
+      .send({ email: 'someone@private-domain.example' }).expect(503);
     expect(fetchImpl).not.toHaveBeenCalled();
   });
   it('rejects invalid JWT before contacting Auth on protected routes', async () => {

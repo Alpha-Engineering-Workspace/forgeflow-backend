@@ -36,6 +36,11 @@ services:
       AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY in .env}
       AUTH_JWT_PUBLIC_KEY_B64: ${AUTH_JWT_PUBLIC_KEY_B64:?Set AUTH_JWT_PUBLIC_KEY_B64 in .env}
       AUTH_JWT_PRIVATE_KEY_B64: ${AUTH_JWT_PRIVATE_KEY_B64:?Set AUTH_JWT_PRIVATE_KEY_B64 in .env}
+      # Missing real delivery config keeps health checks alive but registration returns 503.
+      AUTH_VERIFY_BASE_URL: ${AUTH_VERIFY_BASE_URL:-}
+      AUTH_EMAIL_MODE: ${AUTH_EMAIL_MODE:-resend}
+      AUTH_EMAIL_FROM: ${AUTH_EMAIL_FROM:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-forgeflow_dev}

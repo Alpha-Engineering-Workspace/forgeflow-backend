@@ -1,6 +1,6 @@
 import { AuthError } from './auth.errors.js';
 import { bearerToken } from '../../../../../shared/auth-security.js';
-import { registerSchema, loginSchema, refreshSchema, forgotSchema, resetSchema } from './auth.schema.js';
+import { registerSchema, loginSchema, refreshSchema, forgotSchema, resetSchema, verifyEmailSchema, resendEmailSchema } from './auth.schema.js';
 
 function validate(schema, body) {
   const parsed = schema.safeParse(body);
@@ -20,6 +20,14 @@ export function createAuthController(service) {
       const token = bearerToken(req.headers.authorization);
       if (!token) throw new AuthError(401, 'UNAUTHORIZED', 'Authentication required');
       res.json({ user: await service.currentUser(token) });
+    },
+    verifyEmail: async (req, res) => {
+      await service.verifyEmail(validate(verifyEmailSchema, req.body));
+      res.status(204).end();
+    },
+    resendEmail: async (req, res) => {
+      await service.resendEmail(validate(resendEmailSchema, req.body));
+      res.status(202).json({ message: 'If this address is pending verification, a new link will be sent.' });
     },
     forgot: async (req, res) => {
       await service.forgotPassword(validate(forgotSchema, req.body));

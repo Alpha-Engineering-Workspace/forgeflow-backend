@@ -1,6 +1,8 @@
 const routes = new Map([
   ['POST /register', '/register'],
   ['POST /login', '/login'],
+  ['POST /email/verify', '/email/verify'],
+  ['POST /email/resend', '/email/resend'],
   ['POST /refresh', '/refresh'],
   ['POST /logout', '/logout'],
   ['GET /me', '/me'],
