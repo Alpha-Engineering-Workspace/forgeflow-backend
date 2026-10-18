@@ -12,3 +12,6 @@ export const loginSchema = z.strictObject({ email, password: z.string().min(1).m
 export const refreshSchema = z.strictObject({ refreshToken: token });
 export const forgotSchema = z.strictObject({ email });
 export const resetSchema = z.strictObject({ token, password });
+
+export const verifyEmailSchema = z.strictObject({ token });
+export const resendEmailSchema = z.strictObject({ email });

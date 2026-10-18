@@ -25,7 +25,13 @@ export function createAuthLimiter(redis) {
     const email = typeof req.body?.email === 'string' ? keyHash(req.body.email.trim().toLowerCase()) : 'missing';
     const resetToken = typeof req.body?.token === 'string' ? keyHash(req.body.token) : 'missing';
     let policies;
-    if (req.path === '/login') {
+    if (req.path === '/register') {
+      policies = [[`ff:register:ip:${ip}`, 10, 3600000], [`ff:register:pair:${ip}:${email}`, 3, 3600000]];
+    } else if (req.path === '/email/resend') {
+      policies = [[`ff:verify-resend:ip:${ip}`, 20, 3600000], [`ff:verify-resend:pair:${ip}:${email}`, 3, 3600000]];
+    } else if (req.path === '/email/verify') {
+      policies = [[`ff:verify-token:ip:${ip}`, 30, 900000]];
+    } else if (req.path === '/login') {
       policies = [[`ff:login:ip:${ip}`, 30, 900000], [`ff:login:pair:${ip}:${email}`, 5, 900000]];
     } else if (req.path === '/password/forgot' || req.path === '/password/reset') {
       policies = [[`ff:reset:ip:${ip}`, 20, 3600000], [`ff:reset:pair:${ip}:${req.path === '/password/reset' ? resetToken : email}`, 3, 3600000]];

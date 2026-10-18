@@ -17,7 +17,9 @@ export function createApp(options = {}) {
       }
       next();
     });
-    router.post('/register', proxy);
+    router.post('/register', limiter, proxy);
+    router.post('/email/verify', limiter, proxy);
+    router.post('/email/resend', limiter, proxy);
     router.post('/login', limiter, proxy);
     router.post('/refresh', proxy);
     router.post('/logout', proxy);

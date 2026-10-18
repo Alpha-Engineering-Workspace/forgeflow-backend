@@ -15,6 +15,8 @@ export function createAuthRoutes({ service, internalKey }) {
   const controller = createAuthController(service);
   router.post('/register', controller.register);
   router.post('/login', controller.login);
+  router.post('/email/verify', controller.verifyEmail);
+  router.post('/email/resend', controller.resendEmail);
   router.post('/refresh', controller.refresh);
   router.post('/logout', controller.logout);
   router.get('/me', controller.me);

@@ -10,7 +10,9 @@ const repository = createAuthRepository(pool);
 const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const jwt = { issuer: 'test-auth', audience: 'test-api', publicKey, privateKey };
 const delivered = [];
-const service = createAuthService({ repository, jwt, sendReset: async (mail) => delivered.push(mail) });
+const verificationMails = [];
+const service = createAuthService({ repository, jwt, sendReset: async (mail) => delivered.push(mail),
+  sendVerification: async (mail) => verificationMails.push(mail) });
 const email = `${randomUUID()}@example.test`;
 const password = 'Strong-test-password-123';
 
@@ -26,6 +28,8 @@ describe('3B-F real Auth/PostgreSQL integration', () => {
     expect(user).toMatchObject({ name: 'Ada Example', email });
     expect(user.password_hash).toBeUndefined();
     await expect(service.register({ name: 'Duplicate', email, password })).rejects.toMatchObject({ status: 409, code: 'EMAIL_TAKEN' });
+    await expect(service.login({ email, password })).rejects.toMatchObject({ code: 'EMAIL_NOT_VERIFIED' });
+    await service.verifyEmail({ token: verificationMails.at(-1).token });
   });
   it('rejects invalid credentials and issues a signed JWT and rotating refresh tokens', async () => {
     await expect(service.login({ email, password: 'wrong' })).rejects.toMatchObject({ status: 401 });

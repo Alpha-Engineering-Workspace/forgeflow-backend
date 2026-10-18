@@ -38,7 +38,7 @@ export function makeJwtConfig(environment = process.env, requirePrivate = false)
 export function issueAccessToken(userId, config, now = Math.floor(Date.now() / 1000)) {
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
   const payload = Buffer.from(JSON.stringify({
-    sub: userId, iss: config.issuer, aud: config.audience,
+    sub: userId, iss: config.issuer, aud: config.audience, ev: true,
     iat: now, nbf: now, exp: now + 600, jti: randomUUID(),
   })).toString('base64url');
   const content = `${header}.${payload}`;
@@ -61,7 +61,7 @@ export function verifyAccessToken(token, config, now = Math.floor(Date.now() / 1
   }
   if (header.alg !== 'RS256' || header.typ !== 'JWT' ||
       !verify('RSA-SHA256', Buffer.from(`${h}.${p}`), config.publicKey, Buffer.from(s, 'base64url')) ||
-      body.iss !== config.issuer || body.aud !== config.audience ||
+      body.iss !== config.issuer || body.aud !== config.audience || body.ev !== true ||
       typeof body.sub !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.sub) ||
       !Number.isInteger(body.exp) || !Number.isInteger(body.iat) || !Number.isInteger(body.nbf) ||
       body.exp <= now || body.nbf > now + 30 || body.iat > now + 30 ||
