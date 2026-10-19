@@ -16,6 +16,8 @@ const app = createApp({
   internalKey: process.env.AUTH_INTERNAL_KEY,
   bffKey: process.env.GATEWAY_BFF_KEY,
   redis, jwt: makeJwtConfig(),
+  coreUrl: process.env.CORE_SERVICE_URL,
+  coreInternalKey: process.env.CORE_INTERNAL_KEY,
 });
 const server = startServer(app, config, 'api-gateway');
 server.on('close', () => redis.quit().catch(() => redis.disconnect()));

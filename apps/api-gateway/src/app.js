@@ -3,6 +3,7 @@ import { createHttpApp } from '../../../shared/http.js';
 import { fixedTimeEqual, bearerToken, verifyAccessToken } from '../../../shared/auth-security.js';
 import { createAuthLimiter } from './middleware/auth-limits.js';
 import { createAuthProxy } from './clients/auth-client.js';
+import { createCoreProxy } from './clients/core-client.js';
 
 export function createApp(options = {}) {
   return createHttpApp('api-gateway', (app) => {
@@ -33,5 +34,23 @@ export function createApp(options = {}) {
       next();
     }, proxy);
     app.use('/api/auth', router);
+
+    if (options.coreUrl) {
+      const coreProxy = createCoreProxy(options);
+      const workspaceRouter = Router();
+      workspaceRouter.use((req, res, next) => {
+        if (!fixedTimeEqual(req.get('x-forgeflow-bff-key'), options.bffKey)) {
+          return res.status(403).json({ error: { code: 'FORBIDDEN', message: 'Forbidden' }, requestId: req.requestId });
+        }
+        let verified;
+        try { verified = verifyAccessToken(bearerToken(req.get('authorization')), options.jwt); } catch {
+          return res.status(401).json({ error: { code: 'UNAUTHORIZED', message: 'Invalid access token' }, requestId: req.requestId });
+        }
+        req.userId = verified.userId; // ignore forged x-forgeflow-user-id from caller
+        next();
+      });
+      workspaceRouter.use(coreProxy);
+      app.use('/api/workspaces', workspaceRouter);
+    }
   });
 }
