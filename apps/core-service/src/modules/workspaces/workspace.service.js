@@ -11,6 +11,7 @@ export function createWorkspaceService(repository) {
     return workspace;
   }
   return {
+    authorize: (userId, workspaceId, roles) => requireMember(workspaceId, userId, roles),
     async create(userId, name) {
       return repository.transaction(async (client) => {
         const workspace = await repository.create(client, userId, name);

@@ -68,6 +68,11 @@ services:
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-forgeflow_dev}
       CORE_DB_PASSWORD: ${CORE_DB_PASSWORD:?Set CORE_DB_PASSWORD in .env}
+      # Private Core-only invitation email settings. Reuse existing Resend account safely.
+      WORKSPACE_INVITE_EMAIL_MODE: ${WORKSPACE_INVITE_EMAIL_MODE:-resend}
+      WORKSPACE_INVITE_RESEND_API_KEY: ${RESEND_API_KEY:-}
+      WORKSPACE_INVITE_EMAIL_FROM: ${AUTH_EMAIL_FROM:-}
+      WORKSPACE_INVITE_BASE_URL: ${WORKSPACE_INVITE_BASE_URL:-}
     expose:
       - "3003"
     depends_on:
