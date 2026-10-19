@@ -11,9 +11,11 @@ services:
       HOST: 0.0.0.0
       GATEWAY_PORT: "3001"
       AUTH_SERVICE_URL: http://auth:3002
+      CORE_SERVICE_URL: http://core:3003
       REDIS_URL: redis://redis:6379
       GATEWAY_BFF_KEY: ${GATEWAY_BFF_KEY:?Set GATEWAY_BFF_KEY in .env}
       AUTH_INTERNAL_KEY: ${AUTH_INTERNAL_KEY:?Set AUTH_INTERNAL_KEY in .env}
+      CORE_INTERNAL_KEY: ${CORE_INTERNAL_KEY:?Set CORE_INTERNAL_KEY in .env}
       AUTH_JWT_PUBLIC_KEY_B64: ${AUTH_JWT_PUBLIC_KEY_B64:?Set AUTH_JWT_PUBLIC_KEY_B64 in .env}
     ports:
       - "127.0.0.1:3001:3001"
@@ -61,6 +63,7 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       CORE_PORT: "3003"
+      CORE_INTERNAL_KEY: ${CORE_INTERNAL_KEY:?Set CORE_INTERNAL_KEY in .env}
       DB_HOST: postgres
       DB_PORT: "5432"
       DB_NAME: ${DB_NAME:-forgeflow_dev}
