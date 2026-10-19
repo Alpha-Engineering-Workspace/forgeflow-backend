@@ -36,13 +36,14 @@ jobs:
           for variable in POSTGRES_PASSWORD AUTH_DB_PASSWORD CORE_DB_PASSWORD MIGRATOR_DB_PASSWORD; do
             echo "$variable=$(openssl rand -hex 24)" >> .env
           done
-
+          
       - name: Generate disposable CI authentication secrets
         shell: bash
         run: |
           umask 077
           node scripts/generate-auth-env.js
           cat .env.auth.generated >> .env
+          echo "CORE_INTERNAL_KEY=$(openssl rand -hex 32)" >> .env
           rm .env.auth.generated
 
       - name: Validate Compose files
