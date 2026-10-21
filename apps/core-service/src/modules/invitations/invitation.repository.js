@@ -101,8 +101,11 @@ export function createInvitationRepository(pool) {
     },
     async remove(workspaceId, actor, memberId) {
       return transaction(async (db) => {
+        // Lock project parents first: all issue edits/moves acquire project -> membership -> issues.
+        // Membership removal uses the same order to avoid deadlocks with board moves.
+        await db.query(`SELECT id FROM core.projects WHERE workspace_id=$1 ORDER BY id FOR UPDATE`, [workspaceId]);
         // Lock actor and target to prevent concurrent role changes during removal.
-      const permission = await db.query(`
+        const permission = await db.query(`
         SELECT target.user_id FROM core.workspace_members target
         JOIN core.workspace_members actor ON actor.workspace_id=target.workspace_id
           AND actor.user_id=$2 AND actor.role IN ('OWNER','ADMIN')
@@ -112,10 +115,16 @@ export function createInvitationRepository(pool) {
       `, [workspaceId, actor, memberId]);
       if (!permission.rowCount) return null;
       // Clearing assignments and incrementing version occurs in the same transaction.
-      await db.query(`
+      const affected = await db.query(`
         UPDATE core.issues SET assignee_user_id=NULL, version=version+1, updated_at=NOW()
         WHERE workspace_id=$1 AND assignee_user_id=$2 AND deleted_at IS NULL
+        RETURNING project_id
       `, [workspaceId, memberId]);
+      const changedProjects = [...new Set(affected.rows.map((row) => row.project_id))];
+      if (changedProjects.length) {
+        await db.query(`UPDATE core.projects SET board_version=board_version+1
+          WHERE workspace_id=$1 AND id=ANY($2::uuid[])`, [workspaceId, changedProjects]);
+      }
       const { rows } = await db.query(`
           DELETE FROM core.workspace_members m WHERE m.workspace_id=$1 AND m.user_id=$3
             AND m.role IN ('ADMIN','MEMBER') AND m.user_id<>$2 AND ${allowed}

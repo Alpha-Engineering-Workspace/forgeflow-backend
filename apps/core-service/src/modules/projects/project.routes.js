@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { createProjectController } from './project.controller.js';
 import { createIssueRoutes } from '../issues/issue.routes.js';
+import { createBoardRoutes } from '../boards/board.routes.js';
 const wrap = (handler) => (req, res, next) => Promise.resolve(handler(req, res)).catch(next);
-export function createProjectRoutes(service, issueService) {
+export function createProjectRoutes(service, issueService, boardService) {
   const router = Router({ mergeParams: true });
   const c = createProjectController(service);
   router.get('/', wrap(c.list));
@@ -11,5 +12,6 @@ export function createProjectRoutes(service, issueService) {
   router.patch('/:projectId', wrap(c.update));
   router.post('/:projectId/archive', wrap(c.archive));
   if (issueService) router.use('/:projectId/issues', createIssueRoutes(issueService));
+  if (boardService) router.use('/:projectId/board', createBoardRoutes(boardService));
   return router;
 }

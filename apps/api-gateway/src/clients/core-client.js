@@ -3,6 +3,8 @@ const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 const resource = new RegExp(`^/(${UUID})(/members)?$`);
 const memberItem = new RegExp(`^/(${UUID})/members/(${UUID})$`);
 const projectCollection = new RegExp(`^/(${UUID})/projects$`);
+const boardCollection = new RegExp(`^/(${UUID})/projects/(${UUID})/board$`);
+const boardMove = new RegExp(`^/(${UUID})/projects/(${UUID})/board/moves$`);
 const issueCollection = new RegExp(`^/(${UUID})/projects/(${UUID})/issues$`);
 const issueItem = new RegExp(`^/(${UUID})/projects/(${UUID})/issues/(${UUID})$`);
 const projectItem = new RegExp(`^/(${UUID})/projects/(${UUID})(/archive)?$`);
@@ -14,6 +16,10 @@ export function workspaceCorePath(method, path) {
   if (path === '/invitations/accept') return method === 'POST' ? '/internal/workspaces/invitations/accept' : null;
   let m = memberItem.exec(path);
   if (m) return ['PATCH','DELETE'].includes(method) ? `/internal/workspaces/${m[1]}/members/${m[2]}` : null;
+  m = boardCollection.exec(path);
+  if (m) return method === 'GET' ? `/internal/workspaces/${m[1]}/projects/${m[2]}/board` : null;
+  m = boardMove.exec(path);
+  if (m) return method === 'POST' ? `/internal/workspaces/${m[1]}/projects/${m[2]}/board/moves` : null;
   m = issueCollection.exec(path);
   if (m) return ['GET','POST'].includes(method) ? `/internal/workspaces/${m[1]}/projects/${m[2]}/issues` : null;
   m = issueItem.exec(path);
