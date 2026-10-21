@@ -31,7 +31,10 @@ export function createIssueService(repository, workspaceService, projectService)
       await access(actor, workspaceId, projectId);
       return inActiveProject(actor, workspaceId, projectId, async (client) => {
         await validateAssignee(client, workspaceId, input);
-        return repository.create(client, workspaceId, projectId, actor, input);
+        const issue = await repository.create(client, workspaceId, projectId, actor, input);
+        await repository.normalizePositions(client, workspaceId, projectId);
+        await repository.bumpBoardVersion(client, workspaceId, projectId);
+        return repository.get(workspaceId, projectId, actor, issue.id, client);
       });
     },
     async list(actor, workspaceId, projectId, options) {
@@ -47,14 +50,24 @@ export function createIssueService(repository, workspaceService, projectService)
       await access(actor, workspaceId, projectId);
       const result = await inActiveProject(actor, workspaceId, projectId, async (client) => {
         await validateAssignee(client, workspaceId, input);
-        return repository.update(client, workspaceId, projectId, actor, id, input);
+        const updated = await repository.update(client, workspaceId, projectId, actor, id, input);
+        if (!updated) return null;
+        await repository.normalizePositions(client, workspaceId, projectId);
+        await repository.bumpBoardVersion(client, workspaceId, projectId);
+        return repository.get(workspaceId, projectId, actor, id, client);
       });
       return result ?? staleOrMissing(actor, workspaceId, projectId, id);
     },
     async remove(actor, workspaceId, projectId, id, expectedVersion) {
       await access(actor, workspaceId, projectId, ['OWNER','ADMIN']);
-      const removed = await inActiveProject(actor, workspaceId, projectId, (client) =>
-        repository.remove(client, workspaceId, projectId, actor, id, expectedVersion));
+      const removed = await inActiveProject(actor, workspaceId, projectId, async (client) => {
+        const didRemove = await repository.remove(client, workspaceId, projectId, actor, id, expectedVersion);
+        if (didRemove) {
+          await repository.normalizePositions(client, workspaceId, projectId);
+          await repository.bumpBoardVersion(client, workspaceId, projectId);
+        }
+        return didRemove;
+      });
       if (!removed) await staleOrMissing(actor, workspaceId, projectId, id);
       return undefined;
     },

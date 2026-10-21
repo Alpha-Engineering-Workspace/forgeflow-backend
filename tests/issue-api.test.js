@@ -32,6 +32,8 @@ function fixture() {
   };
   const repository = {
     transaction: (fn) => fn({}),
+    normalizePositions: async () => undefined,
+    bumpBoardVersion: async () => 2,
     async projectForWrite(_db, ws, id, actor) {
       if (ws !== workspaceId || id !== projectId || actor === strangerId) return null;
       return { status: archived ? 'ARCHIVED' : 'ACTIVE' };

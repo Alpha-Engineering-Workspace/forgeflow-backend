@@ -1,7 +1,7 @@
 const columns = `i.id, i.workspace_id AS "workspaceId", i.project_id AS "projectId",
   i.title, i.description, i.type, i.status, i.priority,
   i.assignee_user_id AS "assigneeId", i.created_by AS "createdBy",
-  i.version, i.created_at AS "createdAt", i.updated_at AS "updatedAt"`;
+  i.board_position AS "boardPosition", i.version, i.created_at AS "createdAt", i.updated_at AS "updatedAt"`;
 
 const editingFields = {
   title: 'title', description: 'description', type: 'type',
@@ -24,10 +24,10 @@ export function createIssueRepository(pool) {
     },
     async projectForWrite(client, workspaceId, projectId, actorId) {
       const { rows } = await client.query(`
-        SELECT p.status FROM core.projects p
+        SELECT p.status, p.board_version AS "boardVersion" FROM core.projects p
         JOIN core.workspace_members m ON m.workspace_id=p.workspace_id AND m.user_id=$3
         WHERE p.workspace_id=$1 AND p.id=$2
-        FOR SHARE OF p, m
+        FOR UPDATE OF p FOR SHARE OF m
       `, [workspaceId, projectId, actorId]);
       return rows[0] ?? null;
     },
@@ -37,6 +37,27 @@ export function createIssueRepository(pool) {
         WHERE workspace_id=$1 AND user_id=$2 FOR SHARE
       `, [workspaceId, assigneeId]);
       return rowCount > 0;
+    },
+    async normalizePositions(client, workspaceId, projectId) {
+      // A single project-row lock is already held by the caller.
+      await client.query(`
+        WITH ordered AS (
+          SELECT id, (ROW_NUMBER() OVER (
+            PARTITION BY status ORDER BY board_position ASC NULLS LAST, created_at ASC, id ASC
+          ) - 1)::BIGINT AS position
+          FROM core.issues
+          WHERE workspace_id=$1 AND project_id=$2 AND deleted_at IS NULL
+        )
+        UPDATE core.issues i SET board_position=ordered.position
+        FROM ordered WHERE i.id=ordered.id AND i.board_position IS DISTINCT FROM ordered.position
+      `, [workspaceId, projectId]);
+    },
+    async bumpBoardVersion(client, workspaceId, projectId) {
+      const { rows } = await client.query(`
+        UPDATE core.projects SET board_version=board_version+1
+        WHERE workspace_id=$1 AND id=$2 RETURNING board_version AS "boardVersion"
+      `, [workspaceId, projectId]);
+      return rows[0].boardVersion;
     },
     async create(client, workspaceId, projectId, actorId, input) {
       const { rows } = await client.query(`
@@ -84,8 +105,17 @@ export function createIssueRepository(pool) {
     },
     async update(client, workspaceId, projectId, actorId, id, input) {
       const updates = []; const values = [workspaceId, projectId, actorId, id, input.expectedVersion];
+      let statusParameter;
       for (const [key, column] of Object.entries(editingFields)) {
-        if (Object.hasOwn(input, key)) { values.push(input[key]); updates.push(`${column}=$${values.length}`); }
+        if (Object.hasOwn(input, key)) {
+          values.push(input[key]); updates.push(`${column}=$${values.length}`);
+          if (key === 'status') statusParameter = values.length;
+        }
+      }
+      if (statusParameter) {
+        // M7's direct status edit must append to the destination Kanban lane.
+        updates.push(`board_position=CASE WHEN i.status IS DISTINCT FROM $${statusParameter}
+          THEN NULL ELSE i.board_position END`);
       }
       const { rows } = await client.query(`
         UPDATE core.issues i SET ${updates.join(', ')}, version=version+1, updated_at=NOW()
