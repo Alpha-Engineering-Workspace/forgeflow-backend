@@ -3,6 +3,8 @@ const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 const resource = new RegExp(`^/(${UUID})(/members)?$`);
 const memberItem = new RegExp(`^/(${UUID})/members/(${UUID})$`);
 const projectCollection = new RegExp(`^/(${UUID})/projects$`);
+const issueCollection = new RegExp(`^/(${UUID})/projects/(${UUID})/issues$`);
+const issueItem = new RegExp(`^/(${UUID})/projects/(${UUID})/issues/(${UUID})$`);
 const projectItem = new RegExp(`^/(${UUID})/projects/(${UUID})(/archive)?$`);
 const inviteCollection = new RegExp(`^/(${UUID})/invitations$`);
 const inviteAction = new RegExp(`^/(${UUID})/invitations/(${UUID})/(resend|cancel)$`);
@@ -12,6 +14,10 @@ export function workspaceCorePath(method, path) {
   if (path === '/invitations/accept') return method === 'POST' ? '/internal/workspaces/invitations/accept' : null;
   let m = memberItem.exec(path);
   if (m) return ['PATCH','DELETE'].includes(method) ? `/internal/workspaces/${m[1]}/members/${m[2]}` : null;
+  m = issueCollection.exec(path);
+  if (m) return ['GET','POST'].includes(method) ? `/internal/workspaces/${m[1]}/projects/${m[2]}/issues` : null;
+  m = issueItem.exec(path);
+  if (m) return ['GET','PATCH','DELETE'].includes(method) ? `/internal/workspaces/${m[1]}/projects/${m[2]}/issues/${m[3]}` : null;
   m = projectCollection.exec(path);
   if (m) return ['GET','POST'].includes(method) ? `/internal/workspaces/${m[1]}/projects` : null;
   m = projectItem.exec(path);
@@ -37,9 +43,12 @@ export function createCoreProxy({ coreUrl, coreInternalKey, fetchImpl = fetch })
     const path = workspaceCorePath(req.method, req.path);
     if (!path) return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Route not found' }, requestId: req.requestId });
     const url = new URL(path, base);
-    if (req.method === 'GET' && (req.path === '/' || projectCollection.test(req.path))) {
+    if (req.method === 'GET' && (req.path === '/' || projectCollection.test(req.path) || issueCollection.test(req.path))) {
       // Preserve validated pagination only. Do not forward arbitrary query fields.
-      if (Object.keys(req.query).some((key) => !['page', 'limit', ...(req.path === '/' ? [] : ['status'])].includes(key))) {
+      const allowed = issueCollection.test(req.path)
+        ? ['page', 'limit', 'status', 'priority', 'type', 'assigneeId', 'q']
+        : ['page', 'limit', ...(req.path === '/' ? [] : ['status'])];
+      if (Object.keys(req.query).some((key) => !allowed.includes(key))) {
         return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid pagination' }, requestId: req.requestId });
       }
       if (projectCollection.test(req.path) && req.query.status !== undefined) {
@@ -47,6 +56,30 @@ export function createCoreProxy({ coreUrl, coreInternalKey, fetchImpl = fetch })
           return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid status' }, requestId: req.requestId });
         }
         url.searchParams.set('status', req.query.status);
+      }
+      if (issueCollection.test(req.path)) {
+        const accepted = { status: ['TODO','IN_PROGRESS','IN_REVIEW','DONE'],
+          priority: ['LOW','MEDIUM','HIGH','URGENT'], type: ['TASK','BUG','FEATURE'] };
+        for (const [key, possibilities] of Object.entries(accepted)) {
+          if (req.query[key] !== undefined) {
+            if (typeof req.query[key] !== 'string' || !possibilities.includes(req.query[key])) {
+              return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid issue filter' }, requestId: req.requestId });
+            }
+            url.searchParams.set(key, req.query[key]);
+          }
+        }
+        if (req.query.assigneeId !== undefined) {
+          if (typeof req.query.assigneeId !== 'string' || !new RegExp(`^${UUID}$`).test(req.query.assigneeId)) {
+            return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid assignee' }, requestId: req.requestId });
+          }
+          url.searchParams.set('assigneeId', req.query.assigneeId);
+        }
+        if (req.query.q !== undefined) {
+          if (typeof req.query.q !== 'string' || req.query.q.trim().length < 1 || req.query.q.trim().length > 100) {
+            return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid search' }, requestId: req.requestId });
+          }
+          url.searchParams.set('q', req.query.q.trim());
+        }
       }
       for (const key of ['page', 'limit']) {
         if (req.query[key] !== undefined) {
@@ -69,7 +102,7 @@ export function createCoreProxy({ coreUrl, coreInternalKey, fetchImpl = fetch })
           'x-forgeflow-user-id': req.userId,
           ...(req.verifiedEmail ? { 'x-forgeflow-verified-email': req.verifiedEmail } : {}),
         },
-        ...(['POST', 'PATCH'].includes(req.method) ? { body: JSON.stringify(req.body ?? {}) } : {}),
+        ...(['POST', 'PATCH', 'DELETE'].includes(req.method) ? { body: JSON.stringify(req.body ?? {}) } : {}),
         signal: AbortSignal.timeout(5000),
       });
     } catch (error) {

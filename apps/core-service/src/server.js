@@ -10,13 +10,16 @@ import { createProjectService } from './modules/projects/project.service.js';
 import { createInvitationRepository } from './modules/invitations/invitation.repository.js';
 import { createInvitationService } from './modules/invitations/invitation.service.js';
 import { createInvitationMailer } from './modules/invitations/invitation-mail.js';
+import { createIssueRepository } from './modules/issues/issue.repository.js';
+import { createIssueService } from './modules/issues/issue.service.js';
 
 const config = loadServiceConfig({ portVariable: 'CORE_PORT', defaultPort: 3003 });
 const pool = createCorePool();
 const service = createWorkspaceService(createWorkspaceRepository(pool));
 const projectService = createProjectService(createProjectRepository(pool), service);
+const issueService = createIssueService(createIssueRepository(pool), service, projectService);
 const invitationService = createInvitationService(createInvitationRepository(pool), service, createInvitationMailer());
-const server = startServer(createApp({ service, projectService, invitationService,
+const server = startServer(createApp({ service, projectService, invitationService, issueService,
   internalKey: process.env.CORE_INTERNAL_KEY }), config, 'core-service');
 server.on('close', () => pool.end().catch((error) => {
   logger.error({ errorType: error.name }, 'Core database pool shutdown failed');

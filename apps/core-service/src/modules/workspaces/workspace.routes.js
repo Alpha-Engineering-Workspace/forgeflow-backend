@@ -7,7 +7,7 @@ import { createInvitationController } from '../invitations/invitation.controller
 
 const asyncRoute = (fn) => (req, res, next) => Promise.resolve(fn(req, res)).catch(next);
 
-export function createWorkspaceRoutes({ service, projectService, invitationService, internalKey }) {
+export function createWorkspaceRoutes({ service, projectService, invitationService, issueService, internalKey }) {
   if (!internalKey || internalKey.length < 32) throw new Error('CORE_INTERNAL_KEY must be >= 32 characters');
   const router = Router();
   router.use((req, _res, next) => {
@@ -31,7 +31,7 @@ export function createWorkspaceRoutes({ service, projectService, invitationServi
   router.get('/:workspaceId', asyncRoute(controller.get));
   router.patch('/:workspaceId', asyncRoute(controller.rename));
   router.get('/:workspaceId/members', asyncRoute(controller.members));
-  if (projectService) router.use('/:workspaceId/projects', createProjectRoutes(projectService));
+  if (projectService) router.use('/:workspaceId/projects', createProjectRoutes(projectService, issueService));
   if (invitation) {
     router.get('/:workspaceId/invitations', asyncRoute(invitation.list));
     router.post('/:workspaceId/invitations', asyncRoute(invitation.create));
