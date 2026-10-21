@@ -101,7 +101,22 @@ export function createInvitationRepository(pool) {
     },
     async remove(workspaceId, actor, memberId) {
       return transaction(async (db) => {
-        const { rows } = await db.query(`
+        // Lock actor and target to prevent concurrent role changes during removal.
+      const permission = await db.query(`
+        SELECT target.user_id FROM core.workspace_members target
+        JOIN core.workspace_members actor ON actor.workspace_id=target.workspace_id
+          AND actor.user_id=$2 AND actor.role IN ('OWNER','ADMIN')
+        WHERE target.workspace_id=$1 AND target.user_id=$3 AND target.role IN ('ADMIN','MEMBER')
+          AND target.user_id<>$2
+        FOR UPDATE OF actor, target
+      `, [workspaceId, actor, memberId]);
+      if (!permission.rowCount) return null;
+      // Clearing assignments and incrementing version occurs in the same transaction.
+      await db.query(`
+        UPDATE core.issues SET assignee_user_id=NULL, version=version+1, updated_at=NOW()
+        WHERE workspace_id=$1 AND assignee_user_id=$2 AND deleted_at IS NULL
+      `, [workspaceId, memberId]);
+      const { rows } = await db.query(`
           DELETE FROM core.workspace_members m WHERE m.workspace_id=$1 AND m.user_id=$3
             AND m.role IN ('ADMIN','MEMBER') AND m.user_id<>$2 AND ${allowed}
           RETURNING user_id AS "userId",role
