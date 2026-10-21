@@ -114,7 +114,10 @@ export function createIssueRepository(pool) {
       }
       if (statusParameter) {
         // M7's direct status edit must append to the destination Kanban lane.
-        updates.push(`board_position=CASE WHEN i.status IS DISTINCT FROM $${statusParameter}
+        // PostgreSQL must infer the same type for the status assignment and comparison.
+        // core.issues.status is VARCHAR(20); without a cast this reused parameter
+        // can be inferred as both VARCHAR and TEXT (SQLSTATE 42P08).
+        updates.push(`board_position=CASE WHEN i.status IS DISTINCT FROM $${statusParameter}::varchar(20)
           THEN NULL ELSE i.board_position END`);
       }
       const { rows } = await client.query(`

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../apps/core-service/src/app.js';
 import { createIssueService } from '../apps/core-service/src/modules/issues/issue.service.js';
+import { createIssueRepository } from '../apps/core-service/src/modules/issues/issue.repository.js';
 import { workspaceCorePath } from '../apps/api-gateway/src/clients/core-client.js';
 import { WorkspaceError } from '../apps/core-service/src/modules/workspaces/workspace.errors.js';
 
@@ -118,5 +119,28 @@ describe('M7 issue contract and authorization', () => {
     expect(created.body.issue.version).toBe(1);
     const read = await request(server).get(`${base}/${created.body.issue.id}`).set(headers(ownerId)).expect(200);
     expect(read.body.issue.title).toBe('M7 issue');
+  });
+});
+
+
+describe('M8 issue repository status SQL parameter typing', () => {
+  it('casts the reused status parameter to the VARCHAR(20) DB column type', async () => {
+    const statements = [];
+    const client = { query: async (sql, params) => {
+      statements.push({ sql, params });
+      return { rows: [] }; // No updated row, so this isolated SQL-shape test needs no DB.
+    } };
+    const repository = createIssueRepository({});
+    await repository.update(client, workspaceId, projectId, ownerId, randomUUID(),
+      { status: 'DONE', expectedVersion: 1 });
+    await repository.update(client, workspaceId, projectId, ownerId, randomUUID(),
+      { title: 'Updated title', status: 'IN_REVIEW', expectedVersion: 2 });
+    expect(statements).toHaveLength(2);
+    expect(statements[0].sql).toContain('status=$6');
+    expect(statements[0].sql).toContain('i.status IS DISTINCT FROM $6::varchar(20)');
+    expect(statements[0].params[5]).toBe('DONE');
+    expect(statements[1].sql).toContain('status=$7');
+    expect(statements[1].sql).toContain('i.status IS DISTINCT FROM $7::varchar(20)');
+    expect(statements[1].params[6]).toBe('IN_REVIEW');
   });
 });
