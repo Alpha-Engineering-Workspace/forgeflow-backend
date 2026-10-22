@@ -13,6 +13,8 @@ import { createInvitationMailer } from './modules/invitations/invitation-mail.js
 import { createIssueRepository } from './modules/issues/issue.repository.js';
 import { createIssueService } from './modules/issues/issue.service.js';
 import { createBoardRepository } from './modules/boards/board.repository.js';
+import { createWorkspaceSummaryRepository } from './modules/workspaces/workspace-summary.repository.js';
+import { createWorkspaceSummaryService } from './modules/workspaces/workspace-summary.service.js';
 import { createBoardService } from './modules/boards/board.service.js';
 
 const config = loadServiceConfig({ portVariable: 'CORE_PORT', defaultPort: 3003 });
@@ -23,7 +25,8 @@ const issueRepository = createIssueRepository(pool);
 const issueService = createIssueService(issueRepository, service, projectService);
 const boardService = createBoardService(createBoardRepository(pool), issueRepository, service, projectService);
 const invitationService = createInvitationService(createInvitationRepository(pool), service, createInvitationMailer());
-const server = startServer(createApp({ service, projectService, invitationService, issueService, boardService,
+const summaryService = createWorkspaceSummaryService(createWorkspaceSummaryRepository(pool), service);
+const server = startServer(createApp({ service, projectService, invitationService, issueService, boardService, summaryService,
   internalKey: process.env.CORE_INTERNAL_KEY }), config, 'core-service');
 server.on('close', () => pool.end().catch((error) => {
   logger.error({ errorType: error.name }, 'Core database pool shutdown failed');
