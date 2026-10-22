@@ -1,5 +1,6 @@
 // Explicit allowlist: never pass arbitrary paths or query strings to Core.
 const UUID = '[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}';
+const summaryCollection = new RegExp(`^/(${UUID})/summary$`);
 const resource = new RegExp(`^/(${UUID})(/members)?$`);
 const memberItem = new RegExp(`^/(${UUID})/members/(${UUID})$`);
 const projectCollection = new RegExp(`^/(${UUID})/projects$`);
@@ -14,7 +15,9 @@ const inviteAction = new RegExp(`^/(${UUID})/invitations/(${UUID})/(resend|cance
 export function workspaceCorePath(method, path) {
   if (path === '/' && ['POST', 'GET'].includes(method)) return '/internal/workspaces';
   if (path === '/invitations/accept') return method === 'POST' ? '/internal/workspaces/invitations/accept' : null;
-  let m = memberItem.exec(path);
+  let m = summaryCollection.exec(path);
+  if (m) return method === 'GET' ? `/internal/workspaces/${m[1]}/summary` : null;
+  m = memberItem.exec(path);
   if (m) return ['PATCH','DELETE'].includes(method) ? `/internal/workspaces/${m[1]}/members/${m[2]}` : null;
   m = boardCollection.exec(path);
   if (m) return method === 'GET' ? `/internal/workspaces/${m[1]}/projects/${m[2]}/board` : null;

@@ -8,6 +8,14 @@ services:
     environment:
       NODE_ENV: production
       FORGEFLOW_GATEWAY_URL: http://gateway:3001
+
+      GATEWAY_BFF_KEY: ${GATEWAY_BFF_KEY:?Set GATEWAY_BFF_KEY in .env}
+      FORGEFLOW_SESSION_REDIS_URL: redis://redis:6379
+
+      AUTH_TRUST_HOST: "true"
+      AUTH_URL: http://localhost:3000
+      AUTH_SECRET: ${AUTH_SECRET:?Set AUTH_SECRET in .env}
+
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
